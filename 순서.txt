@@ -1,0 +1,248 @@
+##로그인, 로그아웃
+
+django-admin startproject auth .
+django-admin startapp accounts
+django-admin startapp articles
+python -m venv venv
+source venv/Scripts/activate
+pip install django
+
+
+@ settings.py / "accounts"  "articles" / "DIRS": [BASE_DIR / 'templates'],
+최상위 경로 templates폴더, base.html
+@ accouts의 models.py
+from django.contrib.auth.models import AbstractUser
+class User(AbstractUser):
+    pass # AbstractUser 의 모든 기능을 그대로 사용(이름만 User로)
+@ accounts의 admin.py
+from .models import User
+admin.site.register(User)
+@ settings.py AUTH_USER_MODEL = 'accounts.User'
+
+python manage.py makemigrations
+python manage.py migrate
+python manage.py createsuperuser
+python manage.py runserver
+
+@ admin.py / from django.contrib.auth.admin import UserAdmin
+admin.site.register(User, UserAdmin)
+@ (auth) urls.py / from django.urls import path, include
+path('accounts/', include('accounts.urls')),
+
+@ accounts폴더에 urls.py 생성
+from django.urls import path
+from . import views
+app_name = 'accounts'
+urlpatterns = [
+    path('signup/', views.signup, name='signup'),
+]
+@ views.py
+def signup(request):
+    if request.method == 'POST':
+        pass
+    else:
+        pass
+
+@ forms.py 생성
+from django.contrib.auth.forms import UserCreationForm
+from .models import User
+class CustomUserCreationForm(UserCreationForm):
+    class Meta:
+        model = User
+        fields = ('username',)
+
+@ views.py
+from .forms import CustomUserCreationForm
+def signup(request):
+    if request.method == 'POST':
+        pass
+    else:
+        form = CustomUserCreationForm()
+    context = {
+        'form': form,
+    }
+    return render(request, 'signup.html', context)
+
+@ base.html
+<head>
+ 	 <link href="https://cdn.jsdelivr.net/npm/bootstrap@	5.3.1/dist/css/bootstrap.min.css" rel="stylesheet" 	integrity="sha384-4bw+/aepP/YC94hEpVNVgiZdgIC5	+VKNBQNGCHeKRQN+PtmoHDEXuppvnDJzQIu9" crossorigin="anonymous">
+<head>
+<body>
+  <nav class="navbar navbar-expand-lg bg-body-tertiary">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="#">Navbar</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavAltMarkup" aria-controls="navbarNavAltMarkup" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNavAltMarkup">
+      <div class="navbar-nav">
+        <a class="nav-link active" aria-current="page" href="#">Home</a>
+        <a class="nav-link" href="#">Features</a>
+        <a class="nav-link" href="#">Pricing</a>
+        <a class="nav-link disabled" aria-disabled="true">Disabled</a>
+      </div>
+    </div>
+  </div>
+  </nav>
+
+  <div class="container"></div>
+    {% block body %}
+    {% endblock %}
+  </div>
+
+  	<script src="https://cdn.jsdelivr.net/npm/bootstrap@	5.3.1/dist/js/bootstrap.bundle.min.js" integrity="sha384-	HwwvtgBNo3bZJJLYd8oVXjrBZt8cqVSpeBNS5n7C8IVInixGAoxmnlMuBnhbgrkm" 	crossorigin="anonymous"></script>
+</body>
+</html>
+@ accounts 폴더 내 templates 폴더 내 signup.html
+{% extends 'base.html' %}
+{% block body %}
+<form action="" method="POST">
+  {% csrf_token %}
+  {{form}}
+  <input type="submit">
+</form>
+{% endblock %}
+
+python manage.py runserver (accounts/signup)
+
+@ views.py / from django.shortcuts import render, redirect
+def signup(request):
+#######	pass
+    if request.method == 'POST':
+        form = CustomUserCreationForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect('accounts:signup')
+
+@ base.html / <a class="nav-link" href="{% url 'accounts:signup' %}">Signup</a>
+
+@ (accounts) urls.py / path('login/', views.login, name='login'),
+@ views.py
+def login(request):
+    if request.method == 'POST':
+        pass
+    else:
+        pass
+
+@ forms.py
+from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
+class CustomAuthenticationForm(AuthenticationForm):
+    pass
+
+@ views.py / from .forms import CustomUserCreationForm, CustomAuthenticationForm
+def login(request):
+    if request.method == 'POST':
+        pass
+    else:
+        form = CustomAuthenticationForm()
+    context = {
+        'form': form,
+    }
+    return render(request, 'login.html', context)
+
+@ login.html
+{% extends 'base.html' %}
+{% block body %}
+<form action="" method="POST">
+  {% csrf_token %}
+  {{form}}
+  <input type="submit">
+</form>
+{% endblock %}
+
+@ base.html
+        <a class="nav-link" href="{% url 'accounts:login' %}">Login</a>
+
+@ views.py / from django.contrib.auth import login as auth_login
+def login(request):
+    if request.method == 'POST':
+        form = CustomAuthenticationForm(request, request.POST)
+        if form.is_valid():
+            auth_login(request, form.get_user())
+            return redirect('accounts:login')
+
+@ base.html
+        <a class="nav-link disabled" >{{user}}</a>
+	 <a class="nav-link" href="{% url 'accounts:logout' %}">Logout</a>
+
+@ urls.py (accounts) / path('logout/', views.logout, name='logout'),
+
+@ views.py / from django.contrib.auth import logout as auth_logout
+	def logout(request):
+    auth_logout(request)
+    return redirect('accounts:login')
+
+
+	## 로그인한 유저에게 권한부여
+@ (auth) urls.py / path('articles/', include('articles.urls')),
+
+@ urls.py (articles)
+from django.urls import path
+from . import views
+app_name = 'articles'
+urlpatterns = [
+    path('', views.index, name='index')
+]
+
+@ views.py
+from django.shortcuts import render
+def index(request):
+    return render()
+
+@ models.py
+from django.db import models
+class Article(models.Model):
+    title = models.CharField(max_length=50)
+    content = models.TextField()
+    user = models.ForeignKey()
+
+@ base.html
+<div class="collapse navbar-collapse" id="navbarNavAltMarkup">
+      <div class="navbar-nav">
+
+        {% if user.is_authenticated %}
+        <a class="nav-link" href="{% url 'accounts:logout' %}">Logout</a>
+        <a class="nav-link disabled" >{{user}}</a>
+        {% else %}
+        <a class="nav-link" href="{% url 'accounts:signup' %}">Signup</a>
+        <a class="nav-link" href="{% url 'accounts:login' %}">Login</a>
+        {% endif %}
+
+      </div>
+    </div>
+  </div>
+  </nav>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
