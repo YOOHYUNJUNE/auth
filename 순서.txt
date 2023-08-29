@@ -214,27 +214,240 @@ class Article(models.Model):
   </nav>
 
 
+/////////////   2일차  /////////////////////////////
+
+@ (articles)의 models.py
+from accounts.models import User
+from django.conf import settings
+from django.contrib.auth import get_user_model
+
+# 유저 모델을 참조하는 경우
+ ###  # 방법 1. (권장 X) 유지보수 불편
+ ###  user = models.ForeignKey(User, on_delete=models.CASCADE)
+ ###  # 방법 2. (권장 O) settings.py
+ ###  user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+ ###  # 방법 3. (권장 O)
+    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE)
+class Comment(models.Model):
+    content = models.TextField()
+    article = models.ForeignKey(Article, on_delete=models.CASCADE)
+    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE)
+
+python manage.py makemigrations
+python manage.py migrate
+
+@ (articles) views.py
+from .models import Article
+
+def index(request):
+    articles = Article.objects.all()
+    context = {
+        'articles': articles,
+    }
+    return render(request, 'index.html', context)
+
+@ articles내 templates폴더 내 index.html
+{% extends 'base.html' %}
+{% block body %}
+
+{% for article in articles %}
+<div class="card" style="width: 18rem;">
+  <!-- <img src="..." class="card-img-top" alt="..."> -->
+  <div class="card-body">
+    <h5 class="card-title">{{article.title}}</h5>
+    <p class="card-text">{{article.content}}</p>
+    <!-- <a href="#" class="btn btn-primary">Go somewhere</a> -->
+  </div>
+</div>
+{% endfor %}
+{% endblock %}
+
+@ base.html
+    <a class="navbar-brand" href="{% url 'articles:index' %}">HOME</a>
+
+	<a class="nav-link" href="{% url 'articles:create' %}">Create</a>
+
+@ (articles)내 forms.py 생성
+from django import forms
+from .models import Article
+
+class ArticleForm(forms.ModelForm):
+    class Meta:
+        model = Article
+        ####  fields = '__all__'
+	exclude = ('user', )
+
+
+@ urls.py /     path('create/', views.create, name='create'),
+@ views.py / from .forms import ArticleForm
+def create(request):
+    if request.method == 'POST':
+        pass
+    else:
+        form = ArticleForm()
+    context = {
+        'form': form,
+    }
+    return render(request, 'form.html', context)
 
 
 
+@ form.html
+{% extends 'base.html' %}
+{% block body %}
+<form action="" method="POST">
+  {% csrf_token %}
+  {{form}}
+  <input type="submit">
+</form>
+{% endblock %}
+
+@ views.py / from django.shortcuts import render, redirect
+def create(request):
+    if request.method == 'POST':
+        form = ArticleForm(request.POST)
+        if form.is_valid():
+            article = form.save(commit=False)
+            article.user = request.user # 현재 로그인 한 유저
+            article.save()
+            return redirect('articles:index')
+
+@ views.py / from django.contrib.auth.decorators import login_required
+	@login_required
+	def create(request):
+
+@ (accounts) views.py
+def login(request):
+    if request.method == 'POST':
+        form = CustomAuthenticationForm(request, request.POST)
+        if form.is_valid():
+            auth_login(request, form.get_user())
+
+            # 단축평가 A or B : A가 True면 B에 상관없이 A   /   A가 False면 B         
+  next_url = request.GET.get('next') # articles/create/
+            # return redirect('accounts:login')
+  return redirect(next_url or 'articles:index')
+            # next 인자가 url에 있을때: '/articles/create/' or 'articles:index'
+            # next 인자가 url에 없을때: None or 'articles:index'
+
+# 회원가입시 바로 로그인
+def signup(request):
+
+    if request.user.is_authenticated: # 로그인한 유저
+        return redirect('articles:index')
+
+    if request.method == 'POST':
+        form = CustomUserCreationForm(request.POST)
+        if form.is_valid(): # 비번 confirm까지 될 경우 / 잘못 제출 시 context로 이동
+            user = form.save() # 저장
+            auth_login(request, user) # 가입시 바로 로그인
+            return redirect('articles:index')
+
+@ (articles) index.html
+    <p class="card-text">{{article.user}}</p>
 
 
 
+[django bootstrap]
+pip install django-bootstrap-v5
+@ settings.py 'bootstrap5'
+
+
+### 장고 부트스트랩 ux
+@ (articles) form.html 
+@ (accounts) login.html
+@ (accounts) signup.html
+{% extends 'base.html' %}
+{% load bootstrap5 %}
+{{form}} -> {% bootstrap_form form %}
+
+### .html 파일 양식 통일
+@ (accounts) views.py
+login, signup 마지막 return 주소에 'accounts:signup'
+
+ return render(request, 'account_form.html', context)
+	제목 바꾸기
+
+@ account_form.html
+{% if request.resolver_match.url_name == 'signup' %}
+  <h1>회원가입</h1>
+{% else %}
+  <h1>로그인</h1>
+{% endif %}
 
 
 
+###댓글 기능
+
+@ (articles) forms.py / from .models import Article, Comment
+class CommentForm(forms.ModelForm):
+    class Meta:
+        model = Comment
+        fields = ('content', )
+
+@ views.py / from .forms import ArticleForm, CommentForm
+def index(request):
+    articles = Article.objects.all()
+    form = CommentForm()
+    context = {
+        'articles': articles,
+        'form': form,
 
 
+@ index.html / {% load bootstrap5 %}
+<div class="card-footer">
+    <form action="{% url 'articles:comment_create' article_id=article.id %}" method="POST">
+      {% csrf_token %}
+      {% bootstrap_form form %}
+      <input type="submit">
+    </form>
+  </div>
 
+@ urls.py
+path('<int:article_id>/comments/create/', views.comment_create, name='comment_create'),
 
+@ views.py
+def comment_create(request, article_id):
+    article = Article.objects.get(id=article_id)
+    form = CommentForm(request.POST)
+    if form.is_valid():
+        comment = form.save(commit=False)
+        comment.user = request.user
+        comment.article = article
+        comment.save()
+        return redirect('articles:index')
 
+@ index.html (누가 댓글 썼는지)
+</div>
+  <div class="card-footer">
+    {% for comment in article.comment_set.all %}
+      <p>{{comment.user}} : {{comment.content}}</p>
+    {% endfor %}
+  </div>
+</div>
 
+[로그아웃시 댓글 작성창 안보이게]
+1.
+@ index.html
+{% if request.user.is_authenticated %}
+  <div class="card-footer">
+    <form action="{% url 'articles:comment_create' article_id=article.id %}" method="POST">
+      {% csrf_token %}
+      {% bootstrap_form form %}
+      <input type="submit">
+    </form>
+  </div>
+  {% endif %}
 
+2. (로그인 사람만 보이게)
+@ views.py
 
+@login_required
+def comment_create(request, article_id):
 
-
-
-
+pip freeze : 설치 프로그램들의 버전 저장
+pip freeze >> requirements.txt  : 해당.txt파일에 목록 저장
+pip install -r requirements.txt : 요구 프로그램들을 설치
 
 
 

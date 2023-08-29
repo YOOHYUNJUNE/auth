@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+<!-- {% load bootstrap5 %} -->
+{% block body %}
+
+<!-- 로그인, 회원가입 페이지 입장에 따라 각각의 페이지를 보여줌 -->
+{% if request.resolver_match.url_name == 'signup' %}
+  <h1>회원가입</h1>
+{% else %}
+  <h1>로그인</h1>
+{% endif %}
+
+<form action="" method="POST">
+  {% csrf_token %}
+  {{form}}
+  <!-- {% bootstrap_form form %} -->
+  <input type="submit">
+</form>
+
+{% endblock %}
